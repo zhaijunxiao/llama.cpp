@@ -1,6 +1,8 @@
 #include "common.h"
 #include "llama.h"
 #include "build-info.h"
+#include <memory>
+
 
 // single thread
 #define CPPHTTPLIB_THREAD_POOL_COUNT 1
@@ -629,7 +631,25 @@ static void server_params_parse(int argc, char ** argv, server_params & sparams,
             params.use_mmap = false;
         } else if (arg == "--embedding") {
             params.embedding = true;
-        } else {
+        } else if (arg == "--register_url") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.register_server = argv[i];
+        } else if(arg == "--public_ip"){
+            if(++i >= argc){
+                invalid_param = true;
+                break;
+            }
+            params.public_ip = argv[i];
+        }else if(arg == "--public_port") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.public_port = std::stoi(argv[i]);
+        }else {
             fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());
             server_print_usage(argv[0], default_params, default_sparams);
             exit(1);
@@ -775,6 +795,40 @@ static void log_server_request(const Request & req, const Response & res) {
     });
 }
 
+static void register_server(std::string url,std::string model_name,std::string public_ip,int public_port){
+    int failed_times = 0;
+    while (true)
+    {
+        httplib::Client client(url.c_str());
+
+        //手动构建json字符
+        std::string json_str = "{\"model\":\"" + model_name + "\",\"public_ip\":\"" + public_ip + "\",\"public_port\":" + std::to_string(public_port) + "}";
+
+        // 发起 POST 请求并获取响应
+        auto response = client.Post("/register",json_str,"application/json");
+
+        // 检查请求是否成功
+        if (response && response->status == 200) {
+            failed_times = 0;
+            LOG_INFO("registering server", {
+                { "url", url },
+                { "public_ip", public_ip },
+                { "public_port", public_port },
+            });
+        } else {
+            failed_times++;
+            LOG_ERROR("registering server failed", {
+                { "url", url },
+                { "public_ip", public_ip },
+                { "public_port", public_port },
+                { "failed_times", failed_times },
+            });
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(30));
+    }
+}
+
+
 int main(int argc, char ** argv) {
     // own arguments required by this example
     gpt_params params;
@@ -807,7 +861,6 @@ int main(int argc, char ** argv) {
     }
 
     Server svr;
-
     svr.set_default_headers({
         { "Access-Control-Allow-Origin", "*" },
         { "Access-Control-Allow-Headers", "content-type" }
@@ -966,6 +1019,24 @@ int main(int argc, char ** argv) {
         { "hostname", sparams.hostname },
         { "port", sparams.port },
     });
+
+    //register
+    std::shared_ptr<std::thread> task_thread = nullptr;
+    if (!params.register_server.empty()){
+
+        if(params.public_ip.empty()||params.public_port==0){
+            LOG_ERROR("public ip or port not set", {
+                { "public_ip", params.public_ip },
+                { "public_port", params.public_port },
+            });
+            exit(1);
+        }
+
+        task_thread = std::make_shared<std::thread>([params](){
+            register_server(params.register_server, params.model_alias,params.public_ip, params.public_port);
+        });
+    }
+
 
     if (!svr.listen_after_bind()) {
         return 1;

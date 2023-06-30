@@ -58,6 +58,9 @@ struct gpt_params {
 
     std::string lora_adapter = "";  // lora adapter path
     std::string lora_base    = "";  // base model path for the lora adapter
+    std::string register_server = ""; //register server url
+    std::string public_ip = ""; //public ip address
+    int public_port = 0; //public port
 
     bool memory_f16        = true;  // use f16 instead of f32 for memory kv
     bool random_prompt     = false; // do not randomize prompt if none provided
