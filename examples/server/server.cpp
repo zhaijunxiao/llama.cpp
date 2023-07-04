@@ -483,6 +483,10 @@ static void server_print_usage(const char * argv0, const gpt_params & params,
     fprintf(stderr, "  --port PORT           port to listen (default  (default: %d)\n", sparams.port);
     fprintf(stderr, "  -to N, --timeout N    server read/write timeout in seconds (default: %d)\n", sparams.read_timeout);
     fprintf(stderr, "  --embedding           enable embedding vector output (default: %s)\n", params.embedding ? "enabled" : "disabled");
+    fprintf(stderr, "  --register_url        register the model to the given url (default: %s)\n", params.register_server.c_str());
+    fprintf(stderr, "  --public_ip           public ip address to register the model (default: %s)\n", params.public_ip.c_str());
+    fprintf(stderr,"   --public_port           public port to register the model (default: %d)\n", params.public_port);
+    fprintf(stderr, "\n");
     fprintf(stderr, "\n");
 }
 
